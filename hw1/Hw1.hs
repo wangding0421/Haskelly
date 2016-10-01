@@ -19,9 +19,9 @@ import XMLTypes
 -- Tell us your name, email and student ID, by replacing the respective
 -- strings below
 
-myName  = "Write Your Name  Here"
-myEmail = "Write Your Email Here"
-mySID   = "Write Your SID   Here"
+myName  = "Ding Wang, Danyang Zhang, Qiming Zhang"
+myEmail = "diw005@eng.ucsd.edu, daz040@eng.ucsd.edu, qiz123@eng.ucsd.edu"
+mySID   = "A53089251, A53104006, A53096365"
 
 -- Part 1: Defining and Manipulating Shapes
 -- ----------------------------------------
@@ -47,15 +47,20 @@ type Vertex = (Float, Float)
 --    built with the Polygon constructor.
 
 rectangle :: Side -> Side -> Shape
-rectangle = error "Define me!"
+rectangle s1 s2 = Polygon [(0, 0), (s1, 0), (s1, s2), (0, s2)]
 
 rtTriangle :: Side -> Side -> Shape
-rtTriangle = error "Define me!"
+rtTriangle s1 s2 = Polygon [(0, 0), (s1, 0), (0, s2)]
 
 -- 2. Define a function
 
 sides :: Shape -> Int
-sides = error "Define me!"
+sides (Rectangle _ _) = 4
+sides (Ellipse _ _) = 42
+sides (RtTriangle _ _) = 3
+sides (Polygon vertexs)
+    | length vertexs < 3 = 0
+    | otherwise          = length vertexs
 
 --   which returns the number of sides a given shape has.
 --   For the purposes of this exercise, an ellipse has 42 sides,
@@ -64,7 +69,10 @@ sides = error "Define me!"
 -- 3. Define a function
 
 bigger :: Shape -> Float -> Shape
-bigger = error "Define me!"
+bigger (Rectangle s1 s2) e = Rectangle (s1 * sqrt e) (s2 * sqrt e)
+bigger (Ellipse s1 s2) e = Ellipse (s1 * sqrt e) (s2 * sqrt e)
+bigger (RtTriangle s1 s2) e = RtTriangle (s1 * sqrt e) (s2 * sqrt e)
+bigger (Polygon vertexs) e = Polygon (map (\(x, y) -> (x * sqrt e, y * sqrt e)) vertexs)
 
 --   that takes a shape `s` and expansion factor `e` and returns
 --   a shape which is the same as (i.e., similar to in the geometric sense)
@@ -85,7 +93,12 @@ bigger = error "Define me!"
 --    Write a function
 
 hanoi :: Int -> String -> String -> String -> IO ()
-hanoi = error "Define me!"
+hanoi 0 _ _ _ = return ()
+hanoi 1 a b c = putStrLn("move disc from " ++ a ++ " to " ++ b)
+hanoi n a b c = do 
+    hanoi (n - 1) a c b
+    hanoi 1       a b c
+    hanoi (n - 1) c b a 
 
 --   that, given the number of discs $n$ and peg names $a$, $b$, and $c$,
 --   where a is the starting peg,
