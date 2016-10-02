@@ -394,7 +394,23 @@ myMap f xs = foldr (\elt acc -> f elt:acc) [] xs
 -- in the textual data in the original XML).
 
 formatPlay :: SimpleXML -> SimpleXML
-formatPlay xml = PCDATA "WRITE ME!"
+formatPlay (PCDATA _) = error "Invalid Play XML"
+formatPlay (Element elementName body)
+     | elementName == "PLAY" = Element "html" [Element "body" (format 1 body)]
+     | otherwise             = error "Invalid Play XML"
+
+format :: Int -> [SimpleXML] -> [SimpleXML]
+format _ [] = []
+format num ((Element tag body) : xs) 
+     | tag == "TITLE"     = (Element ("h" ++ show num) body) : format (num+1) xs 
+     | tag == "PERSONAE"  = [Element "h2" [PCDATA "Dramatis Personae"]] ++ format 3 body ++ format 2 xs
+     | tag == "PERSONA"   = body ++ [PCDATA "<br/>"] ++ format 3 xs
+     | tag == "LINE"      = body ++ [PCDATA "<br/>"] ++ format 3 xs
+     | tag == "SPEAKER"   = [Element "b" body] ++ [PCDATA "<br/>"] ++ format 2 xs
+     | tag == "ACT"       = format 2 body ++ format 2 xs
+     | tag == "SCENE"     = format 3 body ++ format 2 xs
+     | tag == "SPEECH"    = format 3 body ++ format 3 xs
+     | otherwise          = error "Invalid Play XML"
 
 -- The main action that we've provided below will use your function to
 -- generate a ﬁle `dream.html` from the sample play. The contents of this
