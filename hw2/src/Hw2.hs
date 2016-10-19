@@ -170,7 +170,6 @@ type Store = Map Variable Value
 -- First, write a function
 
 evalE :: Expression -> State Store Value
-
 -- that takes as input an expression and returns a world-transformer that
 -- returns a value. Yes, right now, the transformer doesnt really transform
 -- the world, but we will use the monad nevertheless as later, the world may
@@ -179,13 +178,17 @@ evalE :: Expression -> State Store Value
 -- **Hint:** The value `get` is of type `State Store Store`. Thus, to extract
 -- the value of the "current store" in a variable `s` use `s <- get`.
 
+
+
 evalOp :: Bop -> Value -> Value -> Value
 evalOp Plus (IntVal i) (IntVal j) = IntVal (i+j)
 
 -- >
-
-evalE (Var x)      = error "TBD"
-evalE (Val v)      = error "TBD"
+evalE (Val v) = do
+  return v
+evalE (Var x) = do
+  s <- get
+  return (findWithDefault (IntVal 0) x s)
 evalE (Op o e1 e2) = error "TBD"
 
 -- Statement Evaluator
