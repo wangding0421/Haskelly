@@ -19,9 +19,9 @@ import Text.Parsec.String
 -- Tell us your name, email and student ID, by replacing the respective
 -- strings below
 
-myName  = "Write Your Name  Here"
-myEmail = "Write Your Email Here"
-mySID   = "Write Your SID   Here"
+myName  = "Ding Wang, Danyang Zhang, Qiming Zhang"
+myEmail = "diw005@eng.ucsd.edu, daz040@eng.ucsd.edu, qiz123@eng.ucsd.edu"
+mySID   = "A53089251, A53104006, A53096365"
 
 
 -- Problem 1: All About `foldl`
@@ -32,7 +32,6 @@ mySID   = "Write Your SID   Here"
 -- 1. Describe `foldl` and give an implementation:
 
 myFoldl :: (a -> b -> a) -> a -> [b] -> a
-myFoldl f b xs = error "TBD"
 
 -- 2. Using the standard `foldl` (not `myFoldl`), define the list reverse function:
 
