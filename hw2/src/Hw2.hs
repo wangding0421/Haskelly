@@ -6,7 +6,8 @@
 module Hw2 where
 
 import Control.Applicative hiding (empty, (<|>))
-import Data.Map
+import Data.Map hiding (foldl, foldr, delete)
+import Data.List hiding (delete)
 import Control.Monad.State hiding (when)
 import Text.Parsec hiding (State, between)
 import Text.Parsec.Combinator hiding (between)
@@ -32,25 +33,44 @@ mySID   = "A53089251, A53104006, A53096365"
 -- 1. Describe `foldl` and give an implementation:
 
 myFoldl :: (a -> b -> a) -> a -> [b] -> a
+myFoldl _ acc [] = acc
+myFoldl f acc (x:xs) = myFoldl f (f acc x) xs
 
 -- 2. Using the standard `foldl` (not `myFoldl`), define the list reverse function:
 
 myReverse :: [a] -> [a]
-myReverse xs = error "TBD"
+myReverse xs = foldl (\acc x -> x:acc) [] xs
 
 -- 3. Define `foldr` in terms of `foldl`:
 
 myFoldr :: (a -> b -> b) -> b -> [a] -> b
-myFoldr f b xs = error "TBD"
+myFoldr f b xs = foldl (flip f) b (reverse xs)
 
 -- 4. Define `foldl` in terms of the standard `foldr` (not `myFoldr`):
 
 myFoldl2 :: (a -> b -> a) -> a -> [b] -> a
-myFoldl2 f b xs = error "TBD"
+myFoldl2 f b xs = foldr (flip f) b (reverse xs)
 
 -- 5. Try applying `foldl` to a gigantic list. Why is it so slow?
 --    Try using `foldl'` (from [Data.List](http://www.haskell.org/ghc/docs/latest/html/libraries/base/Data-List.html#3))
 --    instead; can you explain why it's faster?
+{-
+From the defintion of foldl': Left-associative fold of a structure but with strict application of the operator.
+This ensures that each step of the fold is forced to weak head normal form before being applied, avoiding the collection of
+thunks that would otherwise occur.
+
+From our understanding, foldl' forces the application (rather than lazy evaluation) of the function on accumulator and each element of the list.
+
+On the other hand, in foldl, the application of function is lazy evaluated; therefore it ends up with a stack of unevaluated thunks that
+have to be forced to get a number. Haskell has to recurse deeply to evaluate all the thunks, therefore the performance is slow.
+-}
+
+preludeFoldl :: Int
+preludeFoldl = foldl (+) 0 [1..10000000]
+
+listFoldl :: Int
+listFoldl    = Data.List.foldl' (+) 0 [1..10000000]
+
 
 -- Part 2: Binary Search Trees
 -- ===========================
@@ -64,7 +84,22 @@ data BST k v = Emp
 -- Define a `delete` function for BSTs of this type:
 
 delete :: (Ord k) => k -> BST k v -> BST k v
-delete k t = error "TBD"
+delete _ Emp = Emp
+delete k' (Bind k v l r)
+  | k' < k = Bind k v (delete k' l) r
+  | k' > k = Bind k v l (delete k' r)
+  | otherwise = deleteRoot (Bind k v l r)
+
+deleteRoot :: (Ord k) => BST k v -> BST k v
+deleteRoot (Bind _ _ Emp r) = r
+deleteRoot (Bind k v l r) = Bind key val (delete key l) r
+  where
+    (key, val) = findMax l
+    findMax (Bind k v _ Emp) = (k, v)
+    findMax (Bind _ _ _ r) = findMax r
+
+-- test
+-- tree = Bind 8 1 Emp (Bind 13 3 (Bind 10 3 Emp Emp) (Bind 22 4 (Bind 20 5 Emp Emp) (Bind 35 6 Emp Emp)))
 
 -- Part 3: An Interpreter for WHILE
 -- ================================
@@ -298,8 +333,3 @@ runFile s = do p <- parseFromFile statementP s
 -- Output Store:
 -- fromList [("F",IntVal 2),("N",IntVal 0),("X",IntVal 1),("Z",IntVal 2)]
 -- ~~~~~
-
-
-
-
-
