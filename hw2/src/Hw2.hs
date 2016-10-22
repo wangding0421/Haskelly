@@ -351,7 +351,7 @@ varP = many1 upper
 -- Use the above to write a parser for `Expression` values
 
 exprP :: Parser Expression
-exprP = generalExprP <|> parenExprP <|> valExprP <|> varExprP
+exprP = try generalExprP <|> parenExprP <|> valExprP <|> varExprP
   where
     valExprP = do
       v <- valueP
@@ -365,7 +365,7 @@ exprP = generalExprP <|> parenExprP <|> valExprP <|> varExprP
       string ")"
       return e
     generalExprP = do
-      eLeft <- varExprP <|> valExprP <|> parenExprP  -- TODO
+      eLeft <- try varExprP <|> valExprP <|> parenExprP 
       skipMany space
       op <- opP
       skipMany space
@@ -378,7 +378,50 @@ exprP = generalExprP <|> parenExprP <|> valExprP <|> varExprP
 -- Next, use the expression parsers to build a statement parser
 
 statementP :: Parser Statement
-statementP = error "TBD"
+statementP = try sequenceP <|> assignP <|> ifP <|> whileP <|> skipP
+  where
+    assignP = do
+      v <- varP
+      skipMany space
+      string ":="
+      skipMany space
+      e <- exprP
+      return $ Assign v e
+    ifP = do
+      string "if"
+      skipMany space
+      e <- exprP
+      skipMany space
+      string "then"
+      skipMany space
+      s1 <- statementP
+      skipMany space
+      string "else"
+      skipMany space
+      s2 <- statementP
+      skipMany space
+      string "endif"
+      return $ If e s1 s2
+    whileP = do
+      string "while"
+      skipMany space
+      e <- exprP
+      skipMany space
+      string "do"
+      skipMany space
+      s <- statementP
+      skipMany space
+      string "endwhile"
+      return $ While e s
+    sequenceP = do
+      s1 <- try assignP <|> ifP <|> whileP <|> skipP
+      skipMany space
+      string ";"
+      skipMany space
+      s2 <- statementP
+      return $ Sequence s1 s2
+    skipP = constP "skip" Skip
+
 
 -- When you are done, we can put the parser and evaluator together
 -- in the end-to-end interpreter function
