@@ -303,30 +303,41 @@ w_fact = (Sequence (Assign "N" (Val (IntVal 2))) (Sequence (Assign "F" (Val (Int
 -- First, we will write parsers for the `Value` type
 
 valueP :: Parser Value
-valueP = intP <|> boolP
+valueP = intP <|> boolP  -- <|>This combinator implements choice.
 
 -- To do so, fill in the implementations of
 
 intP :: Parser Value
-intP = error "TBD"
+intP = do
+  x <- many1 digit
+  return $ IntVal (read x)
 
 -- Next, define a parser that will accept a
 -- particular string `s` as a given value `x`
 
+-- consume a string s, box the x
 constP :: String -> a -> Parser a
-constP s x = error "TBD"
+constP s x = do
+  string s
+  return x
 
 -- and use the above to define a parser for boolean values
 -- where `"true"` and `"false"` should be parsed appropriately.
 
 boolP :: Parser Value
-boolP = error "TBD"
+boolP = constP "true" (BoolVal True) <|> constP "false" (BoolVal False)
 
 -- Continue to use the above to parse the binary operators
 
 opP :: Parser Bop
-opP = error "TBD"
-
+opP = constP "+" Plus
+  <|> constP "-" Minus
+  <|> constP "*" Times
+  <|> constP "/" Divide
+  <|> constP "<" Lt
+  <|> constP "<=" Le
+  <|> constP ">" Gt
+  <|> constP ">=" Ge
 
 -- Parsing Expressions
 -- -------------------
@@ -340,7 +351,26 @@ varP = many1 upper
 -- Use the above to write a parser for `Expression` values
 
 exprP :: Parser Expression
-exprP = error "TBD"
+exprP = generalExprP <|> parenExprP <|> valExprP <|> varExprP
+  where
+    valExprP = do
+      v <- valueP
+      return $ Val v
+    varExprP = do
+      x <- varP
+      return $ Var x
+    parenExprP = do
+      string "("
+      e <- exprP
+      string ")"
+      return e
+    generalExprP = do
+      eLeft <- varExprP <|> valExprP <|> parenExprP  -- TODO
+      skipMany space
+      op <- opP
+      skipMany space
+      eRight <- exprP
+      return $ Op op eLeft eRight
 
 -- Parsing Statements
 -- ------------------
