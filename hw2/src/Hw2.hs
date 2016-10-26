@@ -251,7 +251,7 @@ evalS (If e s1 s2)     = do
 -- Finally, write a function
 
 execS :: Statement -> Store -> Store
-execS stmt store = execState (evalS stmt) store
+execS stmt store = execState (evalS stmt) store  -- store, the initial store
 
 -- such that `execS stmt store` returns the new `Store` that results
 -- from evaluating the command `stmt` from the world `store`.
@@ -268,7 +268,7 @@ execS stmt store = execState (evalS stmt) store
 
 run :: Statement -> IO ()
 run stmt = do putStrLn "Output Store:"
-              putStrLn $ show $ execS stmt empty
+              putStrLn $ show $ execS stmt empty  -- initially, it is empty store
 
 -- Here are a few "tests" that you can use to check your implementation.
 
@@ -365,7 +365,7 @@ exprP = try generalExprP <|> parenExprP <|> valExprP <|> varExprP
       string ")"
       return e
     generalExprP = do
-      eLeft <- try varExprP <|> valExprP <|> parenExprP 
+      eLeft <- try varExprP <|> valExprP <|> parenExprP
       skipMany space
       op <- opP
       skipMany space
