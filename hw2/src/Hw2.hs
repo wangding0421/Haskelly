@@ -1,7 +1,6 @@
 -- ---
 -- title: Homework #2, Due Friday 2/12/16
 -- ---
-
 {-# LANGUAGE TypeSynonymInstances #-}
 module Hw2 where
 
@@ -108,6 +107,7 @@ deleteRoot (Bind k v l r) = Bind key val (delete key l) r
 -- a simple *WHILE* language. In this language, we will
 -- represent different program variables as
 
+-- Variable, Statement Expression, Bop, Value
 type Variable = String
 
 -- Programs in the language are simply values of the type
@@ -190,10 +190,10 @@ evalOp Le     (IntVal i) (IntVal j) = BoolVal (i <= j)
 -- >
 
 evalE (Val v) = do
-  return v
+  return v  -- box to ST
 
 evalE (Var x) = do
-  s <- get  -- Where to get the current store: get the current state from the Monad ST
+  s <- get  -- get the current store as result from the Monad ST
   return $ findWithDefault (IntVal 0) x s
 
 evalE (Op o e1 e2) = do
@@ -207,7 +207,7 @@ evalE (Op o e1 e2) = do
 
 -- Next, write a function
 
-evalS :: Statement -> State Store ()  -- statement has a void value
+evalS :: Statement -> State Store ()  -- statement has a void result value
 
 -- that takes as input a statement and returns a world-transformer that
 -- returns a unit. Here, the world-transformer should in fact update the input
@@ -303,14 +303,25 @@ w_fact = (Sequence (Assign "N" (Val (IntVal 2))) (Sequence (Assign "F" (Val (Int
 -- First, we will write parsers for the `Value` type
 
 valueP :: Parser Value
-valueP = intP <|> boolP  -- <|>This combinator implements choice.
+valueP = intP <|> boolP  -- <|> deterministic choice combinator
+
+{-
+http://hackage.haskell.org/package/parsec-3.1.11/docs/Text-Parsec-Char.html
+
+digit: digit parser
+digit :: Stream s m Char => ParsecT s u m Char
+Parses a digit. Returns the parsed character.
+
+string: string parser
+string :: Stream s m Char => String -> ParsecT s u m String
+string s parses a sequence of characters given by s. Returns the parsed string
+-}
 
 -- To do so, fill in the implementations of
-
 intP :: Parser Value
 intP = do
-  x <- many1 digit
-  return $ IntVal (read x)
+  x <- many1 digit -- many1 p applies the parser p one or more times.
+  return $ IntVal (read x) -- read: reads input from a string, opp. show
 
 -- Next, define a parser that will accept a
 -- particular string `s` as a given value `x`
@@ -354,8 +365,8 @@ exprP :: Parser Expression
 exprP = try generalExprP <|> parenExprP <|> valExprP <|> varExprP
   where
     valExprP = do
-      v <- valueP
-      return $ Val v
+      v <- valueP     -- Parse value, then parse expression
+      return $ Val v  -- Expression Value
     varExprP = do
       x <- varP
       return $ Var x
@@ -366,7 +377,7 @@ exprP = try generalExprP <|> parenExprP <|> valExprP <|> varExprP
       return e
     generalExprP = do
       eLeft <- try varExprP <|> valExprP <|> parenExprP
-      skipMany space
+      skipMany space  -- == spaces
       op <- opP
       skipMany space
       eRight <- exprP
