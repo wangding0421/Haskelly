@@ -51,11 +51,9 @@ quickCheckN n = quickCheckWith $ stdArgs { maxSuccess = n}
 -- Tell us your name, email and student ID, by replacing the respective
 -- strings below
 
-myName  = "Write Your Name  Here"
-myEmail = "Write Your Email Here"
-mySID   = "Write Your SID   Here"
-
-
+myName  = "Ding Wang, Danyang Zhang, Qiming Zhang"
+myEmail = "diw005@eng.ucsd.edu, daz040@eng.ucsd.edu, qiz123@eng.ucsd.edu"
+mySID   = "A53089251, A53104006, A53096365"
 
 -- Problem 1: An Interpreter for WHILE++
 -- =====================================
@@ -102,9 +100,9 @@ data Statement =
   | While Expression Statement
   | Sequence Statement Statement
   | Skip
-  | Print String Expression
-  | Throw Expression
-  | Try Statement Variable Statement
+  | Print String Expression  -- new
+  | Throw Expression  -- new
+  | Try Statement Variable Statement -- new
   deriving (Show)
 
 -- The only new constructs are the `Print`, `Throw` and the `Try` statements.
@@ -127,9 +125,78 @@ data Statement =
 -- You can ignore the bits about `StateT` for now.
 
 -- Write a function
+evalOp :: Bop -> Value -> Value -> Value
+evalOp Plus   (IntVal i) (IntVal j) = IntVal (i + j)
+evalOp Minus  (IntVal i) (IntVal j) = IntVal (i - j)
+evalOp Times  (IntVal i) (IntVal j) = IntVal (i * j)
+evalOp Divide (IntVal i) (IntVal j) = IntVal (i `div` j)
+evalOp Gt     (IntVal i) (IntVal j) = BoolVal (i > j)
+evalOp Ge     (IntVal i) (IntVal j) = BoolVal (i >= j)
+evalOp Lt     (IntVal i) (IntVal j) = BoolVal (i < j)
+evalOp Le     (IntVal i) (IntVal j) = BoolVal (i <= j)
+
+evalE :: (MonadState Store m, MonadError Value m) => Expression -> m Value
+evalE (Val v) = do
+  return v
+
+evalE (Var x) = do
+  s <- get
+  let ret = Map.lookup x s
+  case ret of
+    Nothing -> throwError (IntVal 0)  -- undefined
+    Just r  -> return r
+
+evalE (Op o e1 e2) = do
+  v1 <- evalE e1
+  v2 <- evalE e2
+  case (o, v1, v2) of
+    (_, BoolVal _,         _) -> throwError $ IntVal 2
+    (_,         _, BoolVal _) -> throwError $ IntVal 2
+    (Divide,    _, IntVal  0) -> throwError $ IntVal 1
+    (_,         _,         _) -> return $ evalOp o v1 v2
+
 
 evalS :: (MonadState Store m, MonadError Value m, MonadWriter String m) => Statement -> m ()
-evalS = error "TODO"
+evalS (Assign x e)    = do
+  v <- evalE e
+  s <- get
+  put $ Map.insert x v s
+
+evalS w@(While e s)    = do
+  v <- evalE e
+  case v of
+    BoolVal True -> do
+      evalS s
+      evalS w
+    BoolVal False -> evalS Skip
+    IntVal _ -> evalS Skip  -- TODO throwError?
+
+evalS Skip             = return ()
+evalS (Sequence s1 s2) = do
+  evalS s1
+  evalS s2
+
+evalS (If e s1 s2)     = do
+  v <- evalE e
+  case v of
+    BoolVal True  -> evalS s1
+    BoolVal False -> evalS s2
+    IntVal  _     -> evalS Skip  -- TODO throwError?
+
+evalS (Print s e) = do
+  v <- evalE e
+  tell $ s ++ show v ++ "\n"
+
+evalS (Throw e) = do
+  v <- evalE e
+  throwError v
+
+evalS (Try s x h) = do
+  catchError
+    (evalS s)
+    (\e -> do
+        evalS $ Assign x (Val e)
+        evalS h)
 
 -- Next, we will implement a *concrete instance* of a monad `m` that
 -- satisfies the above conditions, by filling in a suitable definition:
@@ -139,7 +206,7 @@ type Eval a = ErrorT Value (WriterT String (State Store)) a
 -- Now, we implement a function to *run* the action from a given store:
 
 runEval :: Eval a -> Store -> ((Either Value a, String), Store)
-runEval act sto = error "TODO"
+runEval act sto = runState (runWriterT $ runErrorT act) sto
 
 -- When you are done, you will get an implementation:
 
@@ -208,6 +275,7 @@ testprog1 = mksequence [Assign "X" $ Val $ IntVal 0,
                                                        Skip,
                         Assign "Z" $ Val $ IntVal 3]
 
+execute1 = execute Map.empty testprog1
 -- Example 2
 -- ---------
 
@@ -251,6 +319,7 @@ testprog2 = mksequence [Assign "X" $ Val $ IntVal 0,
                             "E"
                             (Assign "Z" $ Op Plus (Var "E") (Var "A"))]
 
+execute2 = execute Map.empty testprog2
 
 -- Problem 2: Binary Search Trees Revisited
 -- ========================================
