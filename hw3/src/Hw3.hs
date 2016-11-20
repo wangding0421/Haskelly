@@ -376,11 +376,23 @@ genBSTop  = frequency [(5, genBSTadd), (1, genBSTdel)]
 
 -- (a) Insertion
 -- -------------
+ofList :: [(k, v)] -> BST k v
+ofList [] = Emp
+ofList xs = Bind k v (ofList $ take mid xs) (ofList $ drop (mid+1) xs)
+  where
+    mid = (length xs) `div` 2
+    (k, v) = xs !! mid -- xs[mid]
 
--- Write an insertion function
+listInsert :: (Ord k) => k -> v -> [(k, v)] -> [(k, v)]
+listInsert k v [] = [(k, v)]
+listInsert k v (x@(k', v'):xs)
+   | k == k' = (k, v):xs
+   | k <  k' = (k, v):x:xs
+   | k >  k' = x:(listInsert k v xs)
 
 bstInsert :: (Ord k) => k -> v -> BST k v -> BST k v
-bstInsert = error "TBD"
+bstInsert k v Emp = Bind k v Emp Emp
+bstInsert k v t = ofList $ listInsert k v $ toBinds t
 
 -- such that `bstInsert k v t` inserts a key `k` with value
 -- `v` into the tree `t`. If `k` already exists in the input
@@ -396,11 +408,18 @@ prop_insert_map = forAll (listOf genBSTadd) $ \ops ->
 
 -- (b) Deletion
 -- ------------
+listDelete :: (Ord k) => k -> [(k, v)] -> [(k, v)]
+listDelete _ [] = []
+listDelete k (x@(k', v'):xs)
+  | k == k' = xs
+  | k <  k' = x:xs
+  | k >  k' = x:(listDelete k xs)
 
 -- Write a deletion function for BSTs of this type:
 
 bstDelete :: (Ord k) => k -> BST k v -> BST k v
-bstDelete k t = error "TBD"
+bstDelete k Emp = Emp
+bstDelete k t = ofList $ listDelete k $ toBinds t
 
 -- such that `bstDelete k t` removes the key `k` from the tree `t`.
 -- If `k` is absent from the input tree, then the tree is returned
@@ -431,7 +450,7 @@ isBal Emp            = True
 -- Write a balanced tree generator
 
 genBal :: Gen (BST Int Char)
-genBal = error "TBD"
+genBal = liftM ofBSTops $ listOf genBSTop
 
 -- such that
 
@@ -449,10 +468,14 @@ prop_insert_bal = forAll (listOf genBSTadd) $ isBal . ofBSTops
 prop_delete_bal ::  Property
 prop_delete_bal = forAll (listOf genBSTop) $ isBal . ofBSTops
 
-
-
-
-
+checkN = do
+  quickCheckN 1000 prop_insert_bso
+  quickCheckN 1000 prop_insert_map
+  quickCheckN 1000 prop_delete_bso
+  quickCheckN 1000 prop_delete_map
+  quickCheckN 1000 prop_genBal
+  quickCheckN 1000 prop_insert_bal
+  quickCheckN 1000 prop_delete_bal
 
 -- Problem 3: Circuit Testing
 -- ==========================
