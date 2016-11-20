@@ -390,6 +390,7 @@ listInsert k v (x@(k', v'):xs)
    | k <  k' = (k, v):x:xs
    | k >  k' = x:(listInsert k v xs)
 
+-- Write an insertion function
 bstInsert :: (Ord k) => k -> v -> BST k v -> BST k v
 bstInsert k v Emp = Bind k v Emp Emp
 bstInsert k v t = ofList $ listInsert k v $ toBinds t
