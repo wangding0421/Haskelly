@@ -169,7 +169,7 @@ evalS w@(While e s)    = do
       evalS s
       evalS w
     BoolVal False -> evalS Skip
-    IntVal _ -> evalS Skip  -- TODO throwError?
+    IntVal _ -> throwError $ IntVal 2
 
 evalS Skip             = return ()
 evalS (Sequence s1 s2) = do
@@ -181,7 +181,7 @@ evalS (If e s1 s2)     = do
   case v of
     BoolVal True  -> evalS s1
     BoolVal False -> evalS s2
-    IntVal  _     -> evalS Skip  -- TODO throwError?
+    IntVal  _     -> throwError $ IntVal 2
 
 evalS (Print s e) = do
   v <- evalE e
@@ -730,7 +730,7 @@ prop_Adder_Correct l1 l2 =
 -- yield zero.
 
 prop_bitSubtractor_Correct ::  Signal -> [Bool] -> Bool
-prop_bitSubtractor_Correct bin xs 
+prop_bitSubtractor_Correct bin xs
   | binary xs==0    = binary (sampleN out) == 0
   | otherwise       = binary (sampleN out) == binary xs - binary (sample1 bin)
   where (out, bout) = bitSubtractor(bin, map lift0 xs)
