@@ -730,15 +730,26 @@ prop_Adder_Correct l1 l2 =
 -- yield zero.
 
 prop_bitSubtractor_Correct ::  Signal -> [Bool] -> Bool
-prop_bitSubtractor_Correct = error "TODO"
+prop_bitSubtractor_Correct bin xs 
+  | binary xs==0    = binary (sampleN out) == 0
+  | otherwise       = binary (sampleN out) == binary xs - binary (sample1 bin)
+  where (out, bout) = bitSubtractor(bin, map lift0 xs)
 
 -- 2. Using the `bitAdder` circuit as a model, deﬁne a `bitSubtractor`
 -- circuit that implements this functionality and use QC to check that
 -- your behaves correctly.
 
-bitSubtractor :: (Signal, [Signal]) -> ([Signal], Signal)
-bitSubtractor = error "TODO"
+halfsubstract :: (Signal, Signal) -> (Signal, Signal)
+halfsubstract (x,y) = (sub, bout)
+  where sub   = xor2 (x, y)
+        bout  = and2 (xor2(high, x), y)
 
+bitSubtractor :: (Signal, [Signal]) -> ([Signal], Signal)
+bitSubtractor (bin, []) = ([], bin)
+bitSubtractor (bin, x:xs) = (sub1:subs, bout)
+  where (sub, b)     = halfsubstract(x, bin)
+        (subs, bout) = bitSubtractor(b, xs)
+        sub1         = and2(xor2(high, bout), sub)
 
 -- Problem: Multiplication
 -- -----------------------
@@ -748,7 +759,9 @@ bitSubtractor = error "TODO"
 -- width as input and outputs their product.
 
 prop_Multiplier_Correct ::  [Bool] -> [Bool] -> Bool
-prop_Multiplier_Correct = error "TODO"
+prop_Multiplier_Correct min xs =
+  binary (sampleN mout) == binary min * binary xs
+  where mout = multiplier(map lift0 min, map lift0 xs)
 
 -- 4. Deﬁne a `multiplier` circuit and check that it satisﬁes your
 -- speciﬁcation. (Looking at how adder is deﬁned will help with this,
@@ -756,7 +769,15 @@ prop_Multiplier_Correct = error "TODO"
 -- recursive structure should work, think about how to multiply two
 -- binary numbers on paper.)
 
+halfMultiplier :: Bool -> [Signal] -> [Signal]
+halfMultiplier True xs = xs
+halfMultiplier False xs = take (length xs) (repeat low)
+
 multiplier :: ([Signal], [Signal]) -> [Signal]
-multiplier = error "TODO"
+multiplier (xs, []) = []
+multiplier ([], ys) = []
+multiplier (x:xs, ys) = adder (bitres, remain)
+  where bitres = halfMultiplier(sample1 x) ys
+        remain = multiplier (xs, (low:ys))
 
 -- [1]: http://www.cis.upenn.edu/~bcpierce/courses/552-2008/resources/circuits.hs
