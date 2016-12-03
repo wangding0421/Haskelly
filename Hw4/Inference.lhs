@@ -64,6 +64,8 @@ When you are done, you should be able to infer that the expression
 eSwap = EAbs (EV "x") $ (ELet (EV "a") (EFst (EVbl (EV "x")))
                         (ELet (EV "b") (ESnd (EVbl (EV "x")))
                         (EVbl (EV "b") `ECom` EVbl (EV "a"))))
+
+testESwap = test eSwap
 \end{code}
 
 has the type (equivalent to)
@@ -181,6 +183,9 @@ eMap = ERec (EV "map")
                         (eTl `EApp` (EVbl (EV "xs"))))))
 
           (EVbl (EV "map"))
+
+testELen = typeInference tenv eLen
+testEMap = typeInference tenv eMap  
 \end{code}
 
 have the types equivalent to
@@ -250,15 +255,15 @@ instance Substitutable Type where
   apply _  TBool           = TBool
   apply su t@(TVbl a)      = Map.findWithDefault t a su 
   apply su (t1 `TArr` t2)  = apply su t1 `TArr` apply su t2
-  apply su (t1 `TCom` t2)  = error "TBD"
-  apply su (TList t)       = error "TBD"
-
+  apply su (t1 `TCom` t2)  = apply su t1 `TCom` apply su t2
+  apply su (TList t)       = TList $ apply su t
+  
   freeTvars TInt           =  Set.empty
   freeTvars TBool          =  Set.empty
   freeTvars (TVbl a)       =  Set.singleton a
   freeTvars (t1 `TArr` t2) =  freeTvars t1 `Set.union` freeTvars t2
-  freeTvars (t1 `TCom` t2) = error "TBD"
-  freeTvars (TList t)      = error "TBD"
+  freeTvars (t1 `TCom` t2) =  freeTvars t1 `Set.union` freeTvars t2
+  freeTvars (TList t)      = freeTvars t 
 
 instance Substitutable Scheme where
   apply s (Forall as t)   = Forall as $ apply s' t 
@@ -282,8 +287,15 @@ after         :: Subst -> Subst -> Subst
 su1 `after` su2 = (Map.map (apply su1) su2) `Map.union` su1
 
 
-mgu (l `TCom` r) (l' `TCom` r')  = error "TBD"
-mgu (TList t1) (TList t2)        = error "TBD"
+mgu (l `TCom` r) (l' `TCom` r')  = do
+  s1 <- mgu l l'
+  let rnew  = apply s1 r
+  let rnew' = apply s1 r'
+  s2 <- mgu rnew rnew'
+  return (s2 `after` s1)
+  
+mgu (TList t1) (TList t2)        = mgu t1 t2 
+
 mgu (l `TArr` r) (l' `TArr` r')  = do  s1 <- mgu l l'
                                        s2 <- mgu (apply s1 r) (apply s1 r')
                                        return (s2 `after` s1)
@@ -343,17 +355,59 @@ ti env (ELet x e1 e2) =
         (s2, t2) <- ti (apply s1 env') e2
         return (s2 `after` s1, t2)
 
-ti env (e1 `ECom` e2) = error "TBD"
-ti env (EFst e)       = error "TBD"
-ti env (ESnd e)       = error "TBD"
+ti env (e1 `ECom` e2) = do
+  (s1, t1) <- ti env e1
+  (s2, t2) <- ti (apply s1 env) e2
+  return (s2 `after` s1, (apply s2 t1) `TCom` t2)
+  
+ti env (EFst e)       = do
+  (s1, t) <- ti env e
+  l <- freshTVbl "a"
+  r <- freshTVbl "a"
+  s2 <- mgu t $ l `TCom` r
+  return (s2 `after` s1, apply (s2 `after` s1) l)
 
-ti env ENil            = error "TBD"
-ti env (e1 `ECons` e2) = error "TBD"
-ti env (EIsNil e)      = error "TBD"
-ti env (EDcons e)      = error "TDB"
+ti env (ESnd e)       = do
+  (s1, t) <- ti env e
+  l <- freshTVbl "a"
+  r <- freshTVbl "a"
+  s2 <- mgu t $ l `TCom` r
+  return (s2 `after` s1, apply (s2 `after` s1) r)
 
-ti env (ERec x e1 e2)  = error "TBD"
+ti env ENil            = do
+  tv <- freshTVbl "a"
+  return (empSubst, TList tv)
+  
+ti env (e1 `ECons` e2) = do
+  (s1, t1) <- ti env e1
+  (s2, t2) <- ti (apply s1 env) e2
+  let t1Lifted = TList $ apply s2 t1
+  s3 <- mgu t1Lifted t2
+  return (s3 `after` s2 `after` s1, apply s3 t2)
 
+ti env (EIsNil e)      = do
+  (s, t) <- ti env e
+  a <- freshTVbl "a"
+  s1 <- mgu(TList a) t
+  return (s1 `after` s, TBool)
+  
+ti env (EDcons e)      = do
+  (s, t) <- ti env e
+  a <- freshTVbl "a"
+  s1 <- mgu (TList a) t
+  return (s1 `after` s, (apply s1 a) `TCom` (apply s1 t))
+
+ti env (ERec x e1 e2)  = do
+  a <- freshTVbl "a"
+  let env1 = env \\ (x, Forall [] a)
+  (s1, t1) <- ti env1 e1
+  s2 <- mgu (apply s1 a) t1
+  let s3 = s2 `after` s1
+      a1 = generalize (apply s3 env) (apply s3 t1)
+      env2 = env \\ (x, a1)
+  (s4, t2) <- ti (apply s3 env2) e2
+  return (s4 `after` s3, t2)
+  
 ti_top env e =
     do  (s, t) <- ti env e
         return  $ generalize (apply s env) (apply s t)
@@ -384,6 +438,10 @@ prType (TVbl a)    =   prTVbl a
 prType TInt        =   PP.text "Int"
 prType TBool       =   PP.text "Bool"
 prType (TArr t s)  =   prParenType t PP.<+> PP.text "->" PP.<+> prType s
+prType (TCom t1 t2) =  PP.parens $
+  prParenType t1 PP.<+> PP.text "," PP.<+> prType t2
+prType (TList t) = PP.brackets $ prType t 
+
 prType _           =   PP.text "FINAL optional"
 
 prParenType     ::  Type -> PP.Doc
@@ -410,6 +468,18 @@ prExp (EApp e1 e2)     =   prExp e1 PP.<+> prParenExp e2
 prExp (EAbs x e)       =   PP.char '\\' PP.<+> prEVbl x PP.<+>
                            PP.text "->" PP.<+>
                            prExp e
+
+prExp (e1 `ECom` e2)   = PP.parens $
+  prExp e1 PP.<+> PP.comma PP.<+> prExp e2
+  
+prExp (EFst (e1 `ECom` e2)) = prExp e1
+prExp (ESnd (e1 `ECom` e2)) = prExp e2
+
+prExp (ENil) = PP.text "[]"
+prExp (ECons e1 e2) = PP.parens $
+  prExp e1 PP.<+> PP.colon PP.<+> prParenExp e2
+  
+
 prExp _                =   PP.text "FINAL optional"
                                                                    
 
