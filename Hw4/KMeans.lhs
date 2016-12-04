@@ -80,7 +80,7 @@ between two points. Fix the **specification** (not the code) of `distance` so
 that the code is verified by LH:
 
 \begin{code}
-{-@ distance :: n:Nat -> Point -> Point -> Double @-}
+{-@ distance :: n:Nat -> p1:Point -> {p2:Point|size p1 == size p2} -> Double @-}
 distance n px py = sqrt $ foldr (+) 0 $ zipWith (\x y -> (x - y) ^ 2) px py
 \end{code}
 
@@ -92,7 +92,7 @@ so that LH verifies the given type signature.
 
 \begin{code}
 {-@ nearest :: k:Nat -> n:Nat -> CenteringKN k n -> PointN n -> CenterK k @-}
-nearest k n centers p = fixme "nearest"
+nearest k n centers p = minKeyMap $ M.map (distance n p) centers
 \end{code}
 
 You may want to use the helper `minKeyMap` that computes the key
@@ -131,7 +131,7 @@ which takes two `Cluster` and merges them by adding up their points
 and centers. (Leave the code unmodified).
 
 \begin{code}
-{-@ mergeCluster :: n:Nat -> Cluster -> Cluster -> Cluster @-}
+{-@ mergeCluster :: n:Nat -> ClusterN n -> ClusterN n -> ClusterN n @-}
 mergeCluster n (n1, p1) (n2, p2) = (n1 + n2, zipWith (+) p1 p2)
 \end{code}
 
@@ -146,7 +146,7 @@ dividing each co-ordinate with the cluster size. Fix the **specification**
 of `centroid` so that LH verifies the call to `divide`:
 
 \begin{code}
-{-@ centroid :: n:Nat -> Point -> Int -> Point @-}
+{-@ centroid :: n:Nat -> PointN n -> {s:Int|s > 0} -> PointN n @-}
 centroid n p sz = map (\x -> x `divide` sz) p
 \end{code}
 
