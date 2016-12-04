@@ -53,7 +53,8 @@ Step 2: Group By Key
 --------------------
 
 \begin{code}
-{-@ group :: (Ord k) => List (k, v) -> M.Map k (List v) @-}
+{-@ type ListNE a = {lst:List a | size lst > 0} @-}
+{-@ group :: (Ord k) => List (k, v) -> M.Map k (ListNE v)@-}
 group     = foldr addKV  M.empty
 
 addKV (k,v) m = M.insert k vs' m
@@ -65,7 +66,8 @@ Step 3: Reduce Each Key to Single Value
 ---------------------------------------
 
 \begin{code}
-{-@ collapse  :: (v -> v -> v) -> M.Map k (List v) -> M.Map k v @-}
+-- foldr1 requires non-empty list 
+{-@ collapse  :: (v -> v -> v) -> M.Map k (ListNE v) -> M.Map k v @-}
 collapse f = M.map (foldr1 f)
 
 toList :: M.Map k v -> List (k, v)
