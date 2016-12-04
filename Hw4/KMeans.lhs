@@ -80,7 +80,7 @@ between two points. Fix the **specification** (not the code) of `distance` so
 that the code is verified by LH:
 
 \begin{code}
-{-@ distance :: n:Nat -> p1:Point -> {p2:Point|size p1 == size p2} -> Double @-}
+{-@ distance :: n:Nat -> PointN n -> PointN n -> Double @-}
 distance n px py = sqrt $ foldr (+) 0 $ zipWith (\x y -> (x - y) ^ 2) px py
 \end{code}
 
