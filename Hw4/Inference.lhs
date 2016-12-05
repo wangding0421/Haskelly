@@ -388,7 +388,7 @@ ti env (e1 `ECons` e2) = do
 ti env (EIsNil e)      = do
   (s, t) <- ti env e
   a <- freshTVbl "a"
-  s1 <- mgu(TList a) t
+  s1 <- mgu (TList a) t
   return (s1 `after` s, TBool)
   
 ti env (EDcons e)      = do
