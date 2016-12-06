@@ -69,11 +69,26 @@ type Store = [(Variable, Value)]
 update :: Store -> Variable -> Value -> Store 
 update st x v = (x, v) : st
 
+{-@ lookup :: k:Variable -> {st:Store | has k st} -> Value @-}
 lookup :: Variable -> Store -> Value 
 lookup x ((y, v) : st)
   | x == y         = v 
   | otherwise      = lookup x st
 lookup x []        = impossible "variable not found"
+
+-- For has function
+{-@ inline has @-}
+has :: Variable -> Store -> Bool
+has k m = S.member k (keys m)
+
+{-@ measure keys @-}
+keys :: Store -> S.Set Variable
+keys []        = S.empty
+keys (p:st)    = S.union (addkey p) (keys st)
+
+{-@ measure addkey @-}
+addkey :: (Variable, Value) -> S.Set Variable
+addkey (k,v) = S.singleton k
 \end{code}
 
 Evaluation
@@ -83,6 +98,13 @@ We can now write a function that evaluates `Statement` in a `Store` to yield a
 new *updated* `Store`:
 
 \begin{code}
+{-@ inline validStore @-}
+validStore :: Store -> Statement -> Store -> Bool
+validStore g1 st g2 = readS st   `S.isSubsetOf` keys g1 &&
+                      sequenceS st `S.isSubsetOf` keys g2 &&
+                      keys g1    `S.isSubsetOf` keys g2
+{-@ type ValidStore G1 ST = {g2:Store | validStore G1 ST g2} @-}
+{-@ evalS :: s1:Store  -> st:ScopedStmt s1 -> ValidStore s1 st @-}
 evalS :: Store -> Statement -> Store
 
 evalS st Skip             = st
@@ -103,12 +125,21 @@ evalS st w@(WhileZ e s)   = if v == 0
                               v = evalE st e
 
 evalS st (Sequence s1 s2) = evalS (evalS st s1) s2
+
+{-@ type ScopedStmt G = {e: Statement | isScope G e} @-}
+{-@ inline wellScopedStmt @-}
+wellScopedStmt :: Store -> Statement -> Bool
+wellScopedStmt g s = isScope g s
+{-@ inline isScope @-}
+isScope               :: Store -> Statement -> Bool
+isScope st s          = S.isSubsetOf (readS s) (keys st)
 \end{code}
 
 The above uses a helper that evaluates an `Expression` in a `Store` to get a
 `Value`:
 
 \begin{code}
+{-@ evalE :: s:Store -> e:ScopedExpr s -> Value @-}
 evalE :: Store -> Expression -> Value
 evalE st (Var x)      = lookup x st
 evalE _  (Val v)      = v
@@ -117,6 +148,17 @@ evalE st (Op o e1 e2) = evalOp o (evalE st e1) (evalE st e2)
 evalOp :: Bop -> Value -> Value -> Value
 evalOp Plus  i j = i + j
 evalOp Minus i j = i - j
+
+{-@ measure free @-}
+free                  :: Expression -> S.Set Variable
+free (Val _)          = S.empty
+free (Var x)          = S.singleton x
+free (Op o e1 e2)     = S.union (free e1) (free e2)
+
+{-@ type ScopedExpr G = {e:Expression | wellScopedExpr G e} @-}
+{-@ inline wellScopedExpr @-}
+wellScopedExpr :: Store -> Expression -> Bool
+wellScopedExpr g e = readE e `S.isSubsetOf` keys g
 \end{code}
 
 GOAL: A Safe Evaluator
@@ -147,7 +189,7 @@ interpret s
 
 {-@ inline isSafe @-}
 isSafe :: Statement -> Bool
-isSafe s = True -- TODO: replace with correct implementation 
+isSafe s = (readS s) == S.empty  
 \end{code}
 
 To implement `isSafe` you probably need to write a function that computes the
@@ -157,17 +199,24 @@ To implement `isSafe` you probably need to write a function that computes the
 \begin{code}
 {-@ measure readS @-}
 readS :: Statement -> S.Set Variable
-readS (Assign x e)     = S.empty    -- TODO: replace with proper definition 
-readS (IfZ e s1 s2)    = S.empty    -- TODO: replace with proper definition
-readS (WhileZ e s)     = S.empty    -- TODO: replace with proper definition
-readS (Sequence s1 s2) = S.empty    -- TODO: replace with proper definition
-readS Skip             = S.empty    -- TODO: replace with proper definition
+readS (Assign x e)     = readE e     
+readS (IfZ e s1 s2)    = (readE e) `S.union` (readS s1 `S.union` readS s2)    
+readS (WhileZ e s)     = (readE e) `S.union` (readS s)    
+readS (Sequence s1 s2) = (readS s1) `S.union` (readS s2 `S.difference` sequenceS s1)    
+readS Skip             = S.empty    
+
+{-@ measure sequenceS @-}
+sequenceS :: Statement -> S.Set Variable
+sequenceS (Assign x _)     = S.singleton x
+sequenceS (IfZ e s1 s2)    = sequenceS s1 `S.intersection` sequenceS s2
+sequenceS (Sequence s1 s2) = (sequenceS s1) `S.union` (sequenceS s1)
+sequenceS _                = S.empty
 
 {-@ measure readE @-}
 readE :: Expression -> S.Set Variable   
-readE (Var x)          = S.empty    -- TODO: replace with proper definition
-readE (Val v)          = S.empty    -- TODO: replace with proper definition
-readE (Op o e1 e2)     = S.empty    -- TODO: replace with proper definition
+readE (Var x)          = S.singleton x  
+readE (Val v)          = S.empty    
+readE (Op o e1 e2)     = (readE e1) `S.union` (readE e2)   
 \end{code}
 
 
