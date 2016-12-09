@@ -86,8 +86,7 @@ has k m = S.member k (keys m)
 {-@ measure keys @-}
 keys :: Store -> S.Set Variable
 keys []            = S.empty
-keys ((k,v):st)    = S.union (S.singleton k) (keys st)
-
+keys (p:st)    = S.union (addkey p) (keys st)
 
 {-@ measure addkey @-}
 addkey :: (Variable, Value) -> S.Set Variable
@@ -106,7 +105,6 @@ new *updated* `Store`:
 {-@ inline isScopedStore @-}
 isScopedStore :: Store -> Statement -> Store -> Bool
 isScopedStore g1 st g2 = (sequenceS st `S.union` keys g1) `S.isSubsetOf` keys g2
-
 {-@ evalS :: s:Store  -> st:ScopedStmt s -> WellScopedStore s st @-}
 evalS :: Store -> Statement -> Store
 
@@ -242,7 +240,6 @@ unsafeStatement2 =
      (WhileZ (Val 0) (Assign "Z" (Val 1)))
      `Sequence`
      (Assign "Y" (Var "Z"))
-
 \end{code}
 
 When you are done
