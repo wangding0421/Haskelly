@@ -66,6 +66,8 @@ We will represent the *store* i.e. the machine's memory, as a list of
 \begin{code}
 type Store = [(Variable, Value)]
 
+-- Here, append new 'Assign' statement to the front; 
+-- In lookup function, it is a linear search from the beginning to the end.
 update :: Store -> Variable -> Value -> Store 
 update st x v = (x, v) : st
 
@@ -83,13 +85,15 @@ has k m = S.member k (keys m)
 
 {-@ measure keys @-}
 keys :: Store -> S.Set Variable
-keys []        = S.empty
-keys (p:st)    = S.union (addkey p) (keys st)
+keys []            = S.empty
+keys ((k,v):st)    = S.union (S.singleton k) (keys st)
+
 
 {-@ measure addkey @-}
 addkey :: (Variable, Value) -> S.Set Variable
 addkey (k,v) = S.singleton k
 \end{code}
+ 
 
 Evaluation
 ----------
@@ -98,13 +102,12 @@ We can now write a function that evaluates `Statement` in a `Store` to yield a
 new *updated* `Store`:
 
 \begin{code}
-{-@ inline validStore @-}
-validStore :: Store -> Statement -> Store -> Bool
-validStore g1 st g2 = readS st   `S.isSubsetOf` keys g1 &&
-                      sequenceS st `S.isSubsetOf` keys g2 &&
-                      keys g1    `S.isSubsetOf` keys g2
-{-@ type ValidStore G1 ST = {g2:Store | validStore G1 ST g2} @-}
-{-@ evalS :: s1:Store  -> st:ScopedStmt s1 -> ValidStore s1 st @-}
+{-@ type WellScopedStore G1 ST = {g2:Store | isScopedStore G1 ST g2} @-}
+{-@ inline isScopedStore @-}
+isScopedStore :: Store -> Statement -> Store -> Bool
+isScopedStore g1 st g2 = (sequenceS st `S.union` keys g1) `S.isSubsetOf` keys g2
+
+{-@ evalS :: s:Store  -> st:ScopedStmt s -> WellScopedStore s st @-}
 evalS :: Store -> Statement -> Store
 
 evalS st Skip             = st
@@ -126,13 +129,11 @@ evalS st w@(WhileZ e s)   = if v == 0
 
 evalS st (Sequence s1 s2) = evalS (evalS st s1) s2
 
-{-@ type ScopedStmt G = {e: Statement | isScope G e} @-}
+{-@ type ScopedStmt G = {e: Statement | wellScopedStmt G e} @-}
 {-@ inline wellScopedStmt @-}
 wellScopedStmt :: Store -> Statement -> Bool
-wellScopedStmt g s = isScope g s
-{-@ inline isScope @-}
-isScope               :: Store -> Statement -> Bool
-isScope st s          = S.isSubsetOf (readS s) (keys st)
+wellScopedStmt g s = S.isSubsetOf (readS s) (keys g)
+
 \end{code}
 
 The above uses a helper that evaluates an `Expression` in a `Store` to get a
@@ -149,16 +150,11 @@ evalOp :: Bop -> Value -> Value -> Value
 evalOp Plus  i j = i + j
 evalOp Minus i j = i - j
 
-{-@ measure free @-}
-free                  :: Expression -> S.Set Variable
-free (Val _)          = S.empty
-free (Var x)          = S.singleton x
-free (Op o e1 e2)     = S.union (free e1) (free e2)
-
-{-@ type ScopedExpr G = {e:Expression | wellScopedExpr G e} @-}
-{-@ inline wellScopedExpr @-}
-wellScopedExpr :: Store -> Expression -> Bool
-wellScopedExpr g e = readE e `S.isSubsetOf` keys g
+-- readE is the same as free, so we use readE only.
+{-@ type ScopedExpr G = {e:Expression | wellScoped G e} @-}
+{-@ inline wellScoped @-}
+wellScoped :: Store -> Expression -> Bool
+wellScoped g e = readE e `S.isSubsetOf` keys g
 \end{code}
 
 GOAL: A Safe Evaluator
@@ -246,6 +242,7 @@ unsafeStatement2 =
      (WhileZ (Val 0) (Assign "Z" (Val 1)))
      `Sequence`
      (Assign "Y" (Var "Z"))
+
 \end{code}
 
 When you are done
